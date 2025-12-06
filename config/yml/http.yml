@@ -1,0 +1,14 @@
+# HTTP Server Timeout Configuration
+# All values are in seconds
+
+# Timeout for reading the entire request (including body)
+READ_TIMEOUT_SECONDS: 30
+
+# Timeout for writing the response
+WRITE_TIMEOUT_SECONDS: 30
+
+# Timeout for idle connections
+IDLE_TIMEOUT_SECONDS: 60
+
+# CORS max age in seconds
+MAXAGE: 300

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Wrapper script for production backend deployment
+# Sets EC2_HOST to production server and calls the original deployment script
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# If this script is run from /usr/local/bin, find the actual project directory
+if [[ "$SCRIPT_DIR" == "/usr/local/bin" ]] || [[ "$SCRIPT_DIR" == "/usr/bin" ]]; then
+    # Look for the project directory in common locations
+    for project_path in \
+        "$HOME/projects/ProNexus/backend" \
+        "$HOME/ProNexus/backend" \
+        "$HOME/workspace/ProNexus/backend" \
+        "$HOME/dev/ProNexus/backend" \
+        "/opt/ProNexus/backend" \
+        "/usr/local/ProNexus/backend" \
+        "$(pwd)/backend" \
+        "$(pwd)"
+    do
+        if [[ -f "$project_path/.env" ]]; then
+            SCRIPT_DIR="$project_path"
+            echo "Found project directory: $SCRIPT_DIR"
+            break
+        fi
+    done
+    
+    # If still not found, try to find it relative to current working directory
+    if [[ "$SCRIPT_DIR" == "/usr/local/bin" ]] || [[ "$SCRIPT_DIR" == "/usr/bin" ]]; then
+        current_dir="$(pwd)"
+        while [[ "$current_dir" != "/" ]]; do
+            if [[ -f "$current_dir/.env" ]]; then
+                SCRIPT_DIR="$current_dir"
+                echo "Found project directory from current working directory: $SCRIPT_DIR"
+                break
+            fi
+            current_dir="$(dirname "$current_dir")"
+        done
+    fi
+fi
+
+# Load EC2_HOST from .env file
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    # Source the .env file to load variables
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+    echo "Loaded EC2_HOST=$EC2_HOST from $SCRIPT_DIR/.env"
+else
+    echo "Warning: .env file not found at $SCRIPT_DIR/.env, using default EC2_HOST"
+    export EC2_HOST="18.219.205.161"
+fi
+
+# Call the original deployment script with all arguments
+exec "$SCRIPT_DIR/backend-deploy.sh" "$@" 
