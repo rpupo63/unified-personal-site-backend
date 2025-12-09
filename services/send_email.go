@@ -1,36 +1,14 @@
 package services
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"path/filepath"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/config"
 	"github.com/joho/godotenv"
+	"github.com/resend/resend-go/v2"
+	"github.com/rpupo63/unified-personal-site-backend/config"
 	"github.com/rs/zerolog/log"
 )
-
-// ResendEmailRequest represents the request payload for Resend API
-type ResendEmailRequest struct {
-	From    string   `json:"from"`
-	To      []string `json:"to"`
-	Subject string   `json:"subject"`
-	Html    string   `json:"html,omitempty"`
-	Text    string   `json:"text,omitempty"`
-}
-
-// ResendEmailResponse represents the response from Resend API
-type ResendEmailResponse struct {
-	ID string `json:"id"`
-}
-
-// ResendErrorResponse represents an error response from Resend API
-type ResendErrorResponse struct {
-	Message string `json:"message"`
-}
 
 // SendEmail sends an email using the Resend API
 // Parameters:
@@ -41,9 +19,6 @@ type ResendErrorResponse struct {
 // Requires environment variables in .env:
 //   - RESEND_API_KEY: Your Resend API key
 //   - RESEND_FROM_EMAIL: The sender email address (e.g., "Your Name <[email protected]>")
-//
-// Optional environment variables:
-//   - RESEND_FROM_EMAIL: If not provided, defaults to a generic sender format
 func SendEmail(subject, body string, recipients []string) error {
 	if len(recipients) == 0 {
 		return fmt.Errorf("at least one recipient is required")
@@ -84,60 +59,24 @@ func SendEmail(subject, body string, recipients []string) error {
 		return fmt.Errorf("RESEND_FROM_EMAIL environment variable is required in .env file")
 	}
 
-	// Build the Resend API payload
-	payload := ResendEmailRequest{
+	// Create Resend client
+	client := resend.NewClient(apiKey)
+
+	// Build the email request
+	params := &resend.SendEmailRequest{
 		From:    fromEmail,
 		To:      recipients,
 		Subject: subject,
-		Html:    body, // Assuming body is HTML by default
+		Html:    body,
 	}
 
-	// Marshal payload to JSON
-	jsonPayload, err := json.Marshal(payload)
+	// Send email
+	sent, err := client.Emails.Send(params)
 	if err != nil {
-		return fmt.Errorf("failed to marshal email payload: %w", err)
+		return fmt.Errorf("failed to send email via Resend: %w", err)
 	}
 
-	// Create HTTP request
-	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		return fmt.Errorf("failed to create Resend API request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request to Resend API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read Resend API response: %w", err)
-	}
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		var errorResp ResendErrorResponse
-		if err := json.Unmarshal(bodyBytes, &errorResp); err == nil {
-			return fmt.Errorf("resend API error (status %d): %s", resp.StatusCode, errorResp.Message)
-		}
-		return fmt.Errorf("resend API error (status %d): %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	// Parse successful response
-	var emailResponse ResendEmailResponse
-	if err := json.Unmarshal(bodyBytes, &emailResponse); err != nil {
-		log.Warn().Err(err).Msg("Failed to parse Resend email response, but email was sent")
-	} else {
-		log.Info().Str("emailId", emailResponse.ID).Msg("Successfully sent email via Resend")
-	}
+	log.Info().Str("emailId", sent.Id).Msg("Successfully sent email via Resend")
 
 	return nil
 }

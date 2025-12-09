@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/errs"
+	"github.com/rpupo63/unified-personal-site-backend/errs"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

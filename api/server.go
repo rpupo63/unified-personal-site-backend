@@ -2,15 +2,14 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/config"
-	"github.com/ProNexus-Startup/ProNexus/backend/database"
 	"github.com/go-chi/chi/v5"
+	"github.com/rpupo63/unified-personal-site-backend/config"
+	"github.com/rpupo63/unified-personal-site-backend/database"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,19 +21,18 @@ type Server struct {
 func NewServer(database database.Database) (Server, error) {
 	c := config.New()
 
-	// Ensure correct port is set
-	port := config.GetString(c, "PORT", "8080")
-	address := fmt.Sprintf("0.0.0.0:%s", port) // Bind to 0.0.0.0 for external access
+	// Hardcoded address
+	address := "0.0.0.0:8080" // Bind to 0.0.0.0 for external access
 
 	// Capture startup time
 	startupTime := time.Now()
 
 	router := newRouter(database, withConfig(c), withStartupTime(startupTime))
 
-	// Get timeout values from config with sensible defaults
-	readTimeout := time.Duration(config.GetInt(c, "READ_TIMEOUT_SECONDS", 180)) * time.Second
-	writeTimeout := time.Duration(config.GetInt(c, "WRITE_TIMEOUT_SECONDS", 180)) * time.Second
-	idleTimeout := time.Duration(config.GetInt(c, "IDLE_TIMEOUT_SECONDS", 180)) * time.Second
+	// Hardcoded timeout values
+	readTimeout := 180 * time.Second
+	writeTimeout := 180 * time.Second
+	idleTimeout := 180 * time.Second
 
 	server := &http.Server{
 		Addr:         address,

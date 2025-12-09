@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/database"
-	"github.com/ProNexus-Startup/ProNexus/backend/errs"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
-	"github.com/ProNexus-Startup/ProNexus/backend/services"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/rpupo63/unified-personal-site-backend/database"
+	"github.com/rpupo63/unified-personal-site-backend/errs"
+	"github.com/rpupo63/unified-personal-site-backend/models"
+	"github.com/rpupo63/unified-personal-site-backend/services"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -215,9 +216,25 @@ func (h blogPostHandler) createBlogPost() http.HandlerFunc {
 		// Get mainImageURL from query parameter (optional, for Substack posting)
 		mainImageURL := r.URL.Query().Get("mainImageURL")
 
-		// Post to all social media platforms
-		h.logger.Info().Msg("Posting blog post to all social media platforms")
-		if err := services.PostEverywhere(*createdBlogPost, createdBlogPost.Tags, mainImageURL); err != nil {
+		// Get platforms to post to from query parameter (optional, comma-separated)
+		// Valid values: substack, medium, twitter, linkedin
+		// If not provided, defaults to all platforms for backward compatibility
+		platformsParam := r.URL.Query().Get("platforms")
+		var platformsToPost []string
+		if platformsParam != "" {
+			platformsToPost = strings.Split(platformsParam, ",")
+			// Trim whitespace from each platform name
+			for i := range platformsToPost {
+				platformsToPost[i] = strings.TrimSpace(platformsToPost[i])
+			}
+			h.logger.Info().Strs("platforms", platformsToPost).Msg("Posting blog post to selected social media platforms")
+		} else {
+			// Default to all platforms for backward compatibility
+			platformsToPost = []string{"substack", "medium", "twitter", "linkedin"}
+			h.logger.Info().Msg("Posting blog post to all social media platforms")
+		}
+
+		if err := services.PostEverywhere(*createdBlogPost, createdBlogPost.Tags, mainImageURL, platformsToPost); err != nil {
 			// Log the error but don't fail the request - the blog post was created successfully
 			// The client can check logs or retry posting separately if needed
 			h.logger.Error().Err(err).Msg("Failed to post to some social media platforms, but blog post was created successfully")

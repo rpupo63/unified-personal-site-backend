@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/ProNexus-Startup/ProNexus/backend/database"
+	"github.com/rpupo63/unified-personal-site-backend/database"
 )
 
 // initializeHandlers creates and returns all handlers organized in a routeHandlers struct

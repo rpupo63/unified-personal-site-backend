@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/config"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
 	"github.com/joho/godotenv"
+	"github.com/rpupo63/unified-personal-site-backend/config"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -34,6 +34,9 @@ type SubstackErrorResponse struct {
 // Requires environment variables in .env:
 //   - SUBSTACK_COOKIE: The 'connect.sid' cookie value from your browser session
 //   - SUBSTACK_DOMAIN: Your subdomain (e.g., "betopupo" for betopupo.substack.com)
+//
+// Optional environment variables:
+//   - BASE_URL: Optional unified base URL for constructing blog post links (defaults to empty if not set)
 func PostToSubstack(blogPost models.BlogPost, tags []models.BlogTag, mainImageURL string) error {
 	// 1. Load Configuration (Copying logic from your LinkedIn function)
 	possiblePaths := []string{
@@ -67,9 +70,11 @@ func PostToSubstack(blogPost models.BlogPost, tags []models.BlogTag, mainImageUR
 		return fmt.Errorf("SUBSTACK_DOMAIN environment variable is required")
 	}
 
+	baseURL := GetBaseURL(cfg, "")
+
 	// 3. Construct the HTML Body
-	// Substack expects HTML. We combine the Image, Content, and Link.
-	htmlBody := buildSubstackHtml(blogPost, mainImageURL)
+	// Substack expects HTML. We combine the Image, Content, Tags, and Link.
+	htmlBody := buildSubstackHtml(blogPost, tags, mainImageURL, baseURL)
 
 	// 4. Build Payload
 	payload := map[string]interface{}{
@@ -78,6 +83,25 @@ func PostToSubstack(blogPost models.BlogPost, tags []models.BlogTag, mainImageUR
 		"audience": "public", // or "only_paid", "everyone"
 		"type":     "newsletter",
 		"draft":    false, // Set to true if you only want to save a draft
+	}
+
+	// Add tags to payload if available (Substack API may support this)
+	// Note: This is an unofficial API, so tags field may or may not be supported
+	if len(tags) > 0 {
+		var tagList []string
+		for _, tag := range tags {
+			// Substack tags are typically lowercase and can contain spaces/hyphens
+			// Remove "#" if present, keep the tag value as-is (Substack handles formatting)
+			tagValue := strings.TrimSpace(tag.Value)
+			tagValue = strings.TrimPrefix(tagValue, "#")
+			tagValue = strings.TrimSpace(tagValue)
+			if tagValue != "" {
+				tagList = append(tagList, tagValue)
+			}
+		}
+		if len(tagList) > 0 {
+			payload["tags"] = tagList
+		}
 	}
 
 	jsonPayload, err := json.Marshal(payload)
@@ -115,7 +139,7 @@ func PostToSubstack(blogPost models.BlogPost, tags []models.BlogTag, mainImageUR
 
 	// 8. Handle Response
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("Substack API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("substack API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var postResp SubstackPostResponse
@@ -130,8 +154,8 @@ func PostToSubstack(blogPost models.BlogPost, tags []models.BlogTag, mainImageUR
 }
 
 // buildSubstackHtml converts the raw text content into simple HTML
-// and embeds the main image at the top if provided.
-func buildSubstackHtml(blogPost models.BlogPost, imageURL string) string {
+// and embeds the main image at the top if provided. Also includes tags as hashtags.
+func buildSubstackHtml(blogPost models.BlogPost, tags []models.BlogTag, imageURL, baseURL string) string {
 	var sb strings.Builder
 
 	// 1. Embed Main Image
@@ -156,9 +180,31 @@ func buildSubstackHtml(blogPost models.BlogPost, imageURL string) string {
 		sb.WriteString(content)
 	}
 
-	// 3. Add Footer / Original Link
+	// 3. Add Tags as Hashtags (if available)
+	// Include tags in the HTML body so they're visible even if the API doesn't support the tags field
+	if len(tags) > 0 {
+		var hashtags []string
+		for _, tag := range tags {
+			// Format tag as hashtag for display in content
+			hashtag := FormatHashtag(tag.Value)
+			if hashtag != "" {
+				hashtags = append(hashtags, "#"+hashtag)
+			}
+		}
+		if len(hashtags) > 0 {
+			sb.WriteString(fmt.Sprintf(`<p>%s</p>`, strings.Join(hashtags, " ")))
+		}
+	}
+
+	// 4. Add Footer / Original Link
+	var postURL string
 	if blogPost.URL != nil && *blogPost.URL != "" {
-		sb.WriteString(fmt.Sprintf(`<p><i>Originally published at <a href="%s">%s</a></i></p>`, *blogPost.URL, *blogPost.URL))
+		postURL = *blogPost.URL
+	} else if baseURL != "" {
+		postURL = BuildBlogPostURL(baseURL, blogPost.ID.String())
+	}
+	if postURL != "" {
+		sb.WriteString(fmt.Sprintf(`<p><i>Originally published at <a href="%s">%s</a></i></p>`, postURL, postURL))
 	}
 
 	return sb.String()

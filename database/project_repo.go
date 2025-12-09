@@ -1,8 +1,8 @@
 package database
 
 import (
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
 	"github.com/google/uuid"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"gorm.io/gorm"
 )
 
@@ -50,5 +50,3 @@ func (r *ProjectRepo) Update(project *models.Project) error {
 func (r *ProjectRepo) Delete(id uuid.UUID) error {
 	return r.db.Delete(&models.Project{}, id).Error
 }
-
-

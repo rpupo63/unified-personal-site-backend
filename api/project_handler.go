@@ -6,11 +6,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/database"
-	"github.com/ProNexus-Startup/ProNexus/backend/errs"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/rpupo63/unified-personal-site-backend/database"
+	"github.com/rpupo63/unified-personal-site-backend/errs"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

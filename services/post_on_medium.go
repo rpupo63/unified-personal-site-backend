@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/config"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
 	"github.com/joho/godotenv"
+	"github.com/rpupo63/unified-personal-site-backend/config"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -53,6 +53,9 @@ type MediumErrorResponse struct {
 //   - MEDIUM_INTEGRATION_TOKEN: Integration token from Medium settings
 //   - MEDIUM_PUBLISH_STATUS: Optional publish status (public, draft, unlisted) - defaults to "public"
 //   - MEDIUM_CONTENT_FORMAT: Optional content format (html, markdown) - defaults to "html"
+//
+// Optional environment variables:
+//   - BASE_URL: Optional unified base URL for constructing blog post links (defaults to empty if not set)
 func PostToMedium(blogPost models.BlogPost, tags []models.BlogTag) error {
 	// Load .env file from backend root directory
 	// Try multiple possible paths to find the .env file
@@ -102,8 +105,10 @@ func PostToMedium(blogPost models.BlogPost, tags []models.BlogTag) error {
 		return fmt.Errorf("failed to get Medium user ID: %w", err)
 	}
 
+	baseURL := GetBaseURL(cfg, "")
+
 	// Build the Medium API payload
-	payload := buildMediumPayload(blogPost, tags, contentFormat, publishStatus)
+	payload := buildMediumPayload(blogPost, tags, contentFormat, publishStatus, baseURL)
 
 	// Marshal payload to JSON
 	jsonPayload, err := json.Marshal(payload)
@@ -143,10 +148,10 @@ func PostToMedium(blogPost models.BlogPost, tags []models.BlogTag) error {
 		var errorResp MediumErrorResponse
 		if err := json.Unmarshal(bodyBytes, &errorResp); err == nil {
 			if len(errorResp.Errors) > 0 {
-				return fmt.Errorf("Medium API error (status %d): %s", resp.StatusCode, errorResp.Errors[0].Message)
+				return fmt.Errorf("medium API error (status %d): %s", resp.StatusCode, errorResp.Errors[0].Message)
 			}
 		}
-		return fmt.Errorf("Medium API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("medium API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	// Parse successful response
@@ -195,10 +200,10 @@ func getMediumUserID(integrationToken string) (string, error) {
 		var errorResp MediumErrorResponse
 		if err := json.Unmarshal(bodyBytes, &errorResp); err == nil {
 			if len(errorResp.Errors) > 0 {
-				return "", fmt.Errorf("Medium API error (status %d): %s", resp.StatusCode, errorResp.Errors[0].Message)
+				return "", fmt.Errorf("medium API error (status %d): %s", resp.StatusCode, errorResp.Errors[0].Message)
 			}
 		}
-		return "", fmt.Errorf("Medium API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		return "", fmt.Errorf("medium API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	// Parse successful response
@@ -208,14 +213,14 @@ func getMediumUserID(integrationToken string) (string, error) {
 	}
 
 	if userResponse.Data.ID == "" {
-		return "", fmt.Errorf("Medium API returned empty user ID")
+		return "", fmt.Errorf("medium API returned empty user ID")
 	}
 
 	return userResponse.Data.ID, nil
 }
 
 // buildMediumPayload constructs the Medium API payload
-func buildMediumPayload(blogPost models.BlogPost, tags []models.BlogTag, contentFormat, publishStatus string) map[string]interface{} {
+func buildMediumPayload(blogPost models.BlogPost, tags []models.BlogTag, contentFormat, publishStatus, baseURL string) map[string]interface{} {
 	payload := map[string]interface{}{
 		"title":         blogPost.Title,
 		"contentFormat": contentFormat,
@@ -228,10 +233,9 @@ func buildMediumPayload(blogPost models.BlogPost, tags []models.BlogTag, content
 		var tagList []string
 		for _, tag := range tags {
 			// Medium tags should be lowercase and can contain spaces/hyphens
-			// They don't need hashtag formatting
-			tagValue := strings.TrimSpace(tag.Value)
+			// They don't need hashtag formatting (no "#" symbol)
+			tagValue := formatMediumTag(tag.Value)
 			if tagValue != "" {
-				// Medium allows tags with spaces, but we'll keep them simple
 				tagList = append(tagList, tagValue)
 			}
 		}
@@ -245,9 +249,55 @@ func buildMediumPayload(blogPost models.BlogPost, tags []models.BlogTag, content
 	}
 
 	// Add canonical URL if available
+	var canonicalURL string
 	if blogPost.URL != nil && *blogPost.URL != "" {
-		payload["canonicalUrl"] = *blogPost.URL
+		canonicalURL = *blogPost.URL
+	} else if baseURL != "" {
+		canonicalURL = BuildBlogPostURL(baseURL, blogPost.ID.String())
+	}
+	if canonicalURL != "" {
+		payload["canonicalUrl"] = canonicalURL
 	}
 
 	return payload
+}
+
+// formatMediumTag formats a tag value for Medium API
+// Medium tags:
+// - Should be lowercase (best practice)
+// - Can contain spaces and hyphens
+// - Should not include "#" symbol
+// - Should be trimmed of whitespace
+func formatMediumTag(tag string) string {
+	// Remove leading/trailing whitespace
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return ""
+	}
+
+	// Remove "#" symbol if present at the start
+	tag = strings.TrimPrefix(tag, "#")
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return ""
+	}
+
+	// Convert to lowercase (Medium best practice)
+	tag = strings.ToLower(tag)
+
+	// Medium allows spaces and hyphens, so we keep those
+	// Remove any other special characters that might cause issues
+	var result strings.Builder
+	for _, r := range tag {
+		// Allow letters, numbers, spaces, hyphens, and underscores
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == ' ' || r == '-' || r == '_' {
+			result.WriteRune(r)
+		}
+	}
+
+	formatted := strings.TrimSpace(result.String())
+	// Remove multiple consecutive spaces
+	formatted = strings.Join(strings.Fields(formatted), " ")
+
+	return formatted
 }

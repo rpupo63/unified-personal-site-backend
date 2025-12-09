@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/config"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
+	"github.com/dghubble/oauth1"
 	"github.com/joho/godotenv"
+	"github.com/rpupo63/unified-personal-site-backend/config"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -38,8 +40,12 @@ type TwitterErrorResponse struct {
 // It formats the blog post content with title, summary/content, and tags as hashtags
 // Loads configuration from .env file in the backend root directory
 // Requires environment variables in .env:
-//   - TWITTER_BEARER_TOKEN: OAuth 2.0 Bearer token with tweet.write permission
-//   - TWITTER_BASE_URL: Optional base URL for constructing blog post links (defaults to empty if not set)
+//   - TWITTER_API_KEY: OAuth 1.0a API Key (Consumer Key)
+//   - TWITTER_API_KEY_SECRET: OAuth 1.0a API Key Secret (Consumer Secret)
+//   - TWITTER_ACCESS_TOKEN: OAuth 1.0a Access Token
+//   - TWITTER_ACCESS_TOKEN_SECRET: OAuth 1.0a Access Token Secret
+//   - BASE_URL: Optional unified base URL for constructing blog post links (defaults to empty if not set)
+//   - TWITTER_BASE_URL: Optional platform-specific base URL (fallback for backward compatibility)
 func PostToTwitter(blogPost models.BlogPost, tags []models.BlogTag) error {
 	// Load .env file from backend root directory
 	// Try multiple possible paths to find the .env file
@@ -65,13 +71,26 @@ func PostToTwitter(blogPost models.BlogPost, tags []models.BlogTag) error {
 	// Get config from environment variables
 	cfg := config.New()
 
-	// Get required configuration
-	bearerToken := config.GetString(cfg, "TWITTER_BEARER_TOKEN", "")
-	if bearerToken == "" {
-		return fmt.Errorf("TWITTER_BEARER_TOKEN environment variable is required in .env file")
+	// Get required OAuth 1.0a configuration
+	apiKey := config.GetString(cfg, "TWITTER_API_KEY", "")
+	apiKeySecret := config.GetString(cfg, "TWITTER_API_KEY_SECRET", "")
+	accessToken := config.GetString(cfg, "TWITTER_ACCESS_TOKEN", "")
+	accessTokenSecret := config.GetString(cfg, "TWITTER_ACCESS_TOKEN_SECRET", "")
+
+	if apiKey == "" {
+		return fmt.Errorf("TWITTER_API_KEY environment variable is required in .env file")
+	}
+	if apiKeySecret == "" {
+		return fmt.Errorf("TWITTER_API_KEY_SECRET environment variable is required in .env file")
+	}
+	if accessToken == "" {
+		return fmt.Errorf("TWITTER_ACCESS_TOKEN environment variable is required in .env file")
+	}
+	if accessTokenSecret == "" {
+		return fmt.Errorf("TWITTER_ACCESS_TOKEN_SECRET environment variable is required in .env file")
 	}
 
-	baseURL := config.GetString(cfg, "TWITTER_BASE_URL", "")
+	baseURL := GetBaseURL(cfg, "twitter")
 
 	// Construct the post text
 	postText := buildTwitterPostText(blogPost, tags, baseURL)
@@ -91,13 +110,18 @@ func PostToTwitter(blogPost models.BlogPost, tags []models.BlogTag) error {
 		return fmt.Errorf("failed to create Twitter API request: %w", err)
 	}
 
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+bearerToken)
+	// Set Content-Type header
 	req.Header.Set("Content-Type", "application/json")
 
+	// Configure OAuth 1.0a
+	oauthConfig := oauth1.NewConfig(apiKey, apiKeySecret)
+	oauthToken := oauth1.NewToken(accessToken, accessTokenSecret)
+
+	// Sign the request with OAuth 1.0a
+	httpClient := oauthConfig.Client(context.Background(), oauthToken)
+
 	// Send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request to Twitter API: %w", err)
 	}
@@ -134,8 +158,43 @@ func PostToTwitter(blogPost models.BlogPost, tags []models.BlogTag) error {
 	return nil
 }
 
+// calculateTwitterLength calculates the effective length of text for Twitter's 280 char limit
+// URLs count as 23 characters regardless of their actual length
+func calculateTwitterLength(text string) int {
+	baseLength := len(text)
+
+	// Find URLs in text and adjust length
+	// URLs are counted as 23 chars by Twitter, not their actual length
+	urlPatterns := []string{"http://", "https://"}
+	for _, pattern := range urlPatterns {
+		idx := strings.Index(text, pattern)
+		for idx != -1 {
+			// Find end of URL (space, newline, or end of string)
+			urlEnd := len(text)
+			for i := idx; i < len(text); i++ {
+				if text[i] == ' ' || text[i] == '\n' || text[i] == '\t' {
+					urlEnd = i
+					break
+				}
+			}
+			actualURLLength := urlEnd - idx
+			if actualURLLength > 23 {
+				// Adjust: subtract actual length, add 23
+				baseLength = baseLength - actualURLLength + 23
+			}
+			// Look for next URL after this one
+			idx = strings.Index(text[urlEnd:], pattern)
+			if idx != -1 {
+				idx += urlEnd
+			}
+		}
+	}
+	return baseLength
+}
+
 // buildTwitterPostText constructs the text content for the Twitter post
 // Twitter has a 280 character limit, so we need to be more concise
+// URLs count as 23 characters regardless of their actual length
 func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseURL string) string {
 	var parts []string
 
@@ -149,6 +208,7 @@ func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseU
 	if blogPost.Summary != nil && *blogPost.Summary != "" {
 		summary := *blogPost.Summary
 		// Truncate summary if too long (leave room for URL and hashtags)
+		// Account for URL being 23 chars, not full length
 		maxSummaryLength := 150
 		if len(summary) > maxSummaryLength {
 			truncated := summary[:maxSummaryLength]
@@ -177,12 +237,12 @@ func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseU
 		parts = append(parts, content)
 	}
 
-	// Add URL if available (URLs count as 23 chars in Twitter)
+	// Add URL if available (URLs count as 23 chars in Twitter, not their actual length)
 	if blogPost.URL != nil && *blogPost.URL != "" {
 		parts = append(parts, *blogPost.URL)
 	} else if baseURL != "" {
 		// Construct URL from base URL and post ID
-		url := fmt.Sprintf("%s/blog/%s", strings.TrimSuffix(baseURL, "/"), blogPost.ID.String())
+		url := BuildBlogPostURL(baseURL, blogPost.ID.String())
 		parts = append(parts, url)
 	}
 
@@ -205,11 +265,14 @@ func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseU
 		}
 	}
 
-	// Join parts and ensure total length is within Twitter's 280 character limit
+	// Join parts
 	postText := strings.Join(parts, "\n\n")
 
+	// Calculate effective length (accounting for URL being 23 chars)
+	effectiveLength := calculateTwitterLength(postText)
+
 	// If still too long, truncate more aggressively
-	if len(postText) > 280 {
+	if effectiveLength > 280 {
 		// Try to keep title and URL, truncate content more
 		title := ""
 		url := ""
@@ -223,7 +286,7 @@ func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseU
 		if blogPost.URL != nil && *blogPost.URL != "" {
 			url = "\n\n" + *blogPost.URL
 		} else if baseURL != "" {
-			url = "\n\n" + fmt.Sprintf("%s/blog/%s", strings.TrimSuffix(baseURL, "/"), blogPost.ID.String())
+			url = "\n\n" + BuildBlogPostURL(baseURL, blogPost.ID.String())
 		}
 
 		// Extract hashtags
@@ -245,7 +308,12 @@ func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseU
 		}
 
 		// Calculate available space for content
-		availableSpace := 280 - len(title) - len(url) - len(hashtags)
+		// URL counts as 23 chars, not its actual length
+		urlLength := 23 // Twitter counts URLs as 23 characters
+		if url == "" {
+			urlLength = 0
+		}
+		availableSpace := 280 - len(title) - urlLength - len(hashtags)
 		if availableSpace < 50 {
 			availableSpace = 50 // Minimum space for content
 		}
@@ -271,9 +339,22 @@ func buildTwitterPostText(blogPost models.BlogPost, tags []models.BlogTag, baseU
 
 		postText = title + content + url + hashtags
 
-		// Final safety check - if still too long, hard truncate
-		if len(postText) > 280 {
-			postText = postText[:277] + "..."
+		// Final safety check - calculate effective length (URL = 23 chars)
+		effectiveLength := calculateTwitterLength(postText)
+		if effectiveLength > 280 {
+			// Need to truncate more - reduce content
+			excess := effectiveLength - 280
+			contentLen := len(content)
+			if contentLen > excess+3 {
+				content = content[:contentLen-excess-3] + "..."
+				postText = title + content + url + hashtags
+			} else {
+				// Last resort: hard truncate
+				maxActualLength := 280 - urlLength + len(url) - 3
+				if maxActualLength > 0 && len(postText) > maxActualLength {
+					postText = postText[:maxActualLength] + "..."
+				}
+			}
 		}
 	}
 

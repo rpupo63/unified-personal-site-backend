@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ProNexus-Startup/ProNexus/backend/config"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
 	"github.com/joho/godotenv"
+	"github.com/rpupo63/unified-personal-site-backend/config"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,7 +32,10 @@ type LinkedInErrorResponse struct {
 // Requires environment variables in .env:
 //   - LINKEDIN_ACCESS_TOKEN: OAuth 2.0 access token with w_member_social permission
 //   - LINKEDIN_PERSON_URN: Your LinkedIn person URN (e.g., "urn:li:person:YOUR_ID")
-//   - LINKEDIN_BASE_URL: Optional base URL for constructing blog post links (defaults to empty if not set)
+//   - BASE_URL: Optional unified base URL for constructing blog post links (defaults to empty if not set)
+//   - LINKEDIN_BASE_URL: Optional platform-specific base URL (fallback for backward compatibility)
+//
+// Note: If tags parameter is empty, it will use blogPost.Tags if available
 func PostToLinkedIn(blogPost models.BlogPost, tags []models.BlogTag) error {
 	// Load .env file from backend root directory
 	// Try multiple possible paths to find the .env file
@@ -69,13 +72,22 @@ func PostToLinkedIn(blogPost models.BlogPost, tags []models.BlogTag) error {
 		return fmt.Errorf("LINKEDIN_PERSON_URN environment variable is required in .env file")
 	}
 
-	baseURL := config.GetString(cfg, "LINKEDIN_BASE_URL", "")
+	baseURL := GetBaseURL(cfg, "linkedin")
+
+	// Use tags parameter if provided, otherwise fall back to blogPost.Tags
+	tagsToUse := tags
+	if len(tagsToUse) == 0 && len(blogPost.Tags) > 0 {
+		tagsToUse = blogPost.Tags
+	}
 
 	// Construct the post text
-	postText := buildLinkedInPostText(blogPost, tags, baseURL)
+	postText := buildLinkedInPostText(blogPost, tagsToUse, baseURL)
 
 	// Build the LinkedIn API payload
-	payload := buildLinkedInPayload(personURN, postText, blogPost.URL)
+	// Note: For external article links, we keep shareMediaCategory as "NONE"
+	// and include the URL in the post text. LinkedIn will automatically create
+	// a link preview from the URL in the text.
+	payload := buildLinkedInPayload(personURN, postText)
 
 	// Marshal payload to JSON
 	jsonPayload, err := json.Marshal(payload)
@@ -162,7 +174,7 @@ func buildLinkedInPostText(blogPost models.BlogPost, tags []models.BlogTag, base
 		parts = append(parts, fmt.Sprintf("Read more: %s", *blogPost.URL))
 	} else if baseURL != "" {
 		// Construct URL from base URL and post ID
-		url := fmt.Sprintf("%s/blog/%s", strings.TrimSuffix(baseURL, "/"), blogPost.ID.String())
+		url := BuildBlogPostURL(baseURL, blogPost.ID.String())
 		parts = append(parts, fmt.Sprintf("Read more: %s", url))
 	}
 
@@ -185,7 +197,9 @@ func buildLinkedInPostText(blogPost models.BlogPost, tags []models.BlogTag, base
 }
 
 // buildLinkedInPayload constructs the LinkedIn API payload
-func buildLinkedInPayload(personURN, postText string, postURL *string) map[string]interface{} {
+// For external article links, LinkedIn automatically creates link previews from URLs
+// included in the post text, so we keep shareMediaCategory as "NONE"
+func buildLinkedInPayload(personURN, postText string) map[string]interface{} {
 	payload := map[string]interface{}{
 		"author":         personURN,
 		"lifecycleState": "PUBLISHED",
@@ -200,18 +214,6 @@ func buildLinkedInPayload(personURN, postText string, postURL *string) map[strin
 		"visibility": map[string]string{
 			"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
 		},
-	}
-
-	// If URL is provided, add it as a link
-	if postURL != nil && *postURL != "" {
-		shareContent := payload["specificContent"].(map[string]interface{})["com.linkedin.ugc.ShareContent"].(map[string]interface{})
-		shareContent["shareMediaCategory"] = "ARTICLE"
-		shareContent["media"] = []map[string]string{
-			{
-				"status":      "READY",
-				"originalUrl": *postURL,
-			},
-		}
 	}
 
 	return payload

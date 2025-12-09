@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 	"gorm.io/gorm"
 )
 
@@ -34,4 +34,3 @@ func (r *BlogTagRepo) Add(blogTag *models.BlogTag) error {
 func (r *BlogTagRepo) Delete(blogID string, value string) error {
 	return r.db.Where("blog_id = ? AND value = ?", blogID, value).Delete(&models.BlogTag{}).Error
 }
-

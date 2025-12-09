@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	api "github.com/ProNexus-Startup/ProNexus/backend/api"
-	"github.com/ProNexus-Startup/ProNexus/backend/database"
-	"github.com/ProNexus-Startup/ProNexus/backend/models"
+	api "github.com/rpupo63/unified-personal-site-backend/api"
+	"github.com/rpupo63/unified-personal-site-backend/database"
+	"github.com/rpupo63/unified-personal-site-backend/models"
 )
 
 func main() {
@@ -27,28 +27,18 @@ func main() {
 		fmt.Printf("Warning: Error loading .env file: %v\n", err)
 	}
 
-	dbType := os.Getenv("DB_TYPE")
 	var db *gorm.DB
 	var err error
 	var currentDB database.Database
 
-	// Build connection string based on DB_TYPE
-	var connStr string
-	fmt.Printf("DB_TYPE: %s\n", dbType)
-	switch dbType {
-	case "supa":
-		connStr = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require",
-			getEnv("SUPABASE_DB_HOST", ""),
-			getEnv("SUPABASE_DB_USER", ""),
-			getEnv("SUPABASE_DB_PASSWORD", ""),
-			getEnv("SUPABASE_DB_NAME", ""),
-			getEnv("SUPABASE_DB_PORT", "5432"),
-		)
-		fmt.Println("Connecting to Supabase database...")
-	default:
-		fmt.Println("Unsupported DB_TYPE. Exiting...")
-		os.Exit(1)
-	}
+	connStr := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require",
+		getEnv("SUPABASE_DB_HOST", ""),
+		getEnv("SUPABASE_DB_USER", ""),
+		getEnv("SUPABASE_DB_PASSWORD", ""),
+		getEnv("SUPABASE_DB_NAME", ""),
+		getEnv("SUPABASE_DB_PORT", "5432"),
+	)
+	fmt.Println("Connecting to Supabase database...")
 
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
