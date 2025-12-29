@@ -75,7 +75,7 @@ func PostToMedium(blogPost models.BlogPost, tags []models.BlogTag) error {
 	}
 
 	if !envLoaded {
-		log.Warn().Msg("Failed to load .env file from any expected location, using existing environment variables")
+		log.Debug().Msg("No .env file found, using system environment variables (e.g., from Coolify)")
 	}
 
 	// Get config from environment variables
@@ -84,7 +84,7 @@ func PostToMedium(blogPost models.BlogPost, tags []models.BlogTag) error {
 	// Get required configuration
 	integrationToken := config.GetString(cfg, "MEDIUM_INTEGRATION_TOKEN", "")
 	if integrationToken == "" {
-		return fmt.Errorf("MEDIUM_INTEGRATION_TOKEN environment variable is required in .env file")
+		return fmt.Errorf("MEDIUM_INTEGRATION_TOKEN environment variable is required")
 	}
 
 	publishStatus := config.GetString(cfg, "MEDIUM_PUBLISH_STATUS", "public")

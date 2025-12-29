@@ -65,7 +65,7 @@ func PostToTwitter(blogPost models.BlogPost, tags []models.BlogTag) error {
 	}
 
 	if !envLoaded {
-		log.Warn().Msg("Failed to load .env file from any expected location, using existing environment variables")
+		log.Debug().Msg("No .env file found, using system environment variables (e.g., from Coolify)")
 	}
 
 	// Get config from environment variables
@@ -78,16 +78,16 @@ func PostToTwitter(blogPost models.BlogPost, tags []models.BlogTag) error {
 	accessTokenSecret := config.GetString(cfg, "TWITTER_ACCESS_TOKEN_SECRET", "")
 
 	if apiKey == "" {
-		return fmt.Errorf("TWITTER_API_KEY environment variable is required in .env file")
+		return fmt.Errorf("TWITTER_API_KEY environment variable is required")
 	}
 	if apiKeySecret == "" {
-		return fmt.Errorf("TWITTER_API_KEY_SECRET environment variable is required in .env file")
+		return fmt.Errorf("TWITTER_API_KEY_SECRET environment variable is required")
 	}
 	if accessToken == "" {
-		return fmt.Errorf("TWITTER_ACCESS_TOKEN environment variable is required in .env file")
+		return fmt.Errorf("TWITTER_ACCESS_TOKEN environment variable is required")
 	}
 	if accessTokenSecret == "" {
-		return fmt.Errorf("TWITTER_ACCESS_TOKEN_SECRET environment variable is required in .env file")
+		return fmt.Errorf("TWITTER_ACCESS_TOKEN_SECRET environment variable is required")
 	}
 
 	baseURL := GetBaseURL(cfg, "twitter")

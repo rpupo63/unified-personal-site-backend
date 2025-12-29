@@ -107,7 +107,7 @@ This means your connection string or `SUPABASE_DB_PORT` is set to 6543. Change i
 
 ### Environment File
 
-The application automatically loads environment variables from a `.env` file in the project root (if present). You can create a `.env` file with your database configuration:
+The application automatically loads environment variables from a `.env` file in the project root (if present). This is useful for local development. You can create a `.env` file with your database configuration:
 
 ```bash
 # .env file example
@@ -123,6 +123,45 @@ SUPABASE_DB_USER=myuser
 SUPABASE_DB_PASSWORD=mypassword
 SUPABASE_DB_NAME=mydb
 ```
+
+**Important:** Environment variables from the system (e.g., provided by deployment platforms) always take precedence over values in `.env` files. This ensures that production configurations are never overridden by local development files.
+
+## Deployment Platforms
+
+### Coolify Support
+
+This application is fully compatible with [Coolify](https://coolify.io) and other container-based deployment platforms. The application automatically reads environment variables provided by Coolify at runtime.
+
+**How it works:**
+
+1. **Local Development:** The app attempts to load a `.env` file for convenience during local development
+2. **Production (Coolify):** Environment variables are provided directly by Coolify and automatically used by the application
+3. **Precedence:** System environment variables (from Coolify) always override `.env` file values
+
+**Setting Environment Variables in Coolify:**
+
+1. Navigate to your application in Coolify
+2. Go to the "Environment Variables" section
+3. Add the required environment variables (see "Required Environment Variables" above)
+4. The application will automatically use these variables on the next deployment
+
+**Required Environment Variables for Coolify:**
+
+Set these in Coolify's environment variables section:
+
+- `DATABASE_URL` or `SUPABASE_DB_URL` (full connection string), OR
+- `SUPABASE_DB_HOST`, `SUPABASE_DB_USER`, `SUPABASE_DB_PASSWORD` (individual components)
+- `PORT` (optional, defaults to 8080)
+- `ACCEPTED_ORIGINS` (comma-separated list of allowed CORS origins)
+- `BACKEND_PASSWORD` (for API authentication)
+- Any service-specific variables (e.g., `RESEND_API_KEY`, `MEDIUM_INTEGRATION_TOKEN`, etc.)
+
+**Additional Environment Variables:**
+
+- `GENERATE_MODELS` - Set to `true` to generate database models (development only)
+- `GENERATE_COLUMN_REPORT` - Set to `true` to generate column mismatch report (development only)
+
+The application will automatically detect and use environment variables provided by Coolify without requiring any `.env` file.
 
 ## Running the Application
 

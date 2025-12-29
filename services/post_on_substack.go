@@ -54,7 +54,7 @@ func PostToSubstack(blogPost models.BlogPost, tags []models.BlogTag, mainImageUR
 	}
 
 	if !envLoaded {
-		log.Warn().Msg("Failed to load .env file, using existing environment variables")
+		log.Debug().Msg("No .env file found, using system environment variables (e.g., from Coolify)")
 	}
 
 	cfg := config.New()

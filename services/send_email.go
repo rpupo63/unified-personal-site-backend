@@ -42,7 +42,7 @@ func SendEmail(subject, body string, recipients []string) error {
 	}
 
 	if !envLoaded {
-		log.Warn().Msg("Failed to load .env file from any expected location, using existing environment variables")
+		log.Debug().Msg("No .env file found, using system environment variables (e.g., from Coolify)")
 	}
 
 	// Get config from environment variables
@@ -51,12 +51,12 @@ func SendEmail(subject, body string, recipients []string) error {
 	// Get required configuration
 	apiKey := config.GetString(cfg, "RESEND_API_KEY", "")
 	if apiKey == "" {
-		return fmt.Errorf("RESEND_API_KEY environment variable is required in .env file")
+		return fmt.Errorf("RESEND_API_KEY environment variable is required")
 	}
 
 	fromEmail := config.GetString(cfg, "RESEND_FROM_EMAIL", "")
 	if fromEmail == "" {
-		return fmt.Errorf("RESEND_FROM_EMAIL environment variable is required in .env file")
+		return fmt.Errorf("RESEND_FROM_EMAIL environment variable is required")
 	}
 
 	// Create Resend client

@@ -55,7 +55,7 @@ func PostToLinkedIn(blogPost models.BlogPost, tags []models.BlogTag) error {
 	}
 
 	if !envLoaded {
-		log.Warn().Msg("Failed to load .env file from any expected location, using existing environment variables")
+		log.Debug().Msg("No .env file found, using system environment variables (e.g., from Coolify)")
 	}
 
 	// Get config from environment variables
@@ -64,12 +64,12 @@ func PostToLinkedIn(blogPost models.BlogPost, tags []models.BlogTag) error {
 	// Get required configuration
 	accessToken := config.GetString(cfg, "LINKEDIN_ACCESS_TOKEN", "")
 	if accessToken == "" {
-		return fmt.Errorf("LINKEDIN_ACCESS_TOKEN environment variable is required in .env file")
+		return fmt.Errorf("LINKEDIN_ACCESS_TOKEN environment variable is required")
 	}
 
 	personURN := config.GetString(cfg, "LINKEDIN_PERSON_URN", "")
 	if personURN == "" {
-		return fmt.Errorf("LINKEDIN_PERSON_URN environment variable is required in .env file")
+		return fmt.Errorf("LINKEDIN_PERSON_URN environment variable is required")
 	}
 
 	baseURL := GetBaseURL(cfg, "linkedin")
