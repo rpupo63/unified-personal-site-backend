@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -76,6 +77,9 @@ func newRouter(database database.Database, opts ...func(*router)) *chi.Mux {
 	chiRouter := chi.NewRouter()
 	chiRouter.Use(LogInternalServerErrors)
 
+	// Healthcheck endpoint - accessible from any origin
+	chiRouter.Get("/healthcheck", healthcheckHandler(router.startupTime))
+
 	// Get backend password from config
 	backendPassword := config.GetString(router.config, "BACKEND_PASSWORD", "")
 
@@ -122,5 +126,36 @@ func (s Server) ShutdownGracefully(timeout time.Duration) {
 		log.Error().Msgf("Error shutting down the server: %v", err)
 	} else {
 		log.Info().Msg("HttpServer gracefully shut down")
+	}
+}
+
+// healthcheckHandler returns a handler function for the healthcheck endpoint
+// It returns the current date/time and the server startup time (when this version was deployed)
+func healthcheckHandler(startupTime time.Time) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers to allow all origins
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		// Handle preflight requests
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Create response with current time and startup time
+		response := map[string]interface{}{
+			"current_time":  time.Now().Format(time.RFC3339),
+			"startup_time":  startupTime.Format(time.RFC3339),
+			"uptime_seconds": int(time.Since(startupTime).Seconds()),
+		}
+
+		// Write JSON response
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Error().Err(err).Msg("Error encoding healthcheck response")
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 }

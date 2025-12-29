@@ -166,6 +166,35 @@ API documentation is available via Swagger at:
 - Swagger UI: `http://localhost:8080/swagger/index.html`
 - Swagger JSON: `http://localhost:8080/swagger/doc.json`
 
+## Healthcheck Endpoint
+
+The backend provides a healthcheck endpoint that can be accessed from any origin:
+
+- **Endpoint:** `GET /healthcheck`
+- **CORS:** Accessible from any origin (no authentication required)
+- **Response:** JSON object containing:
+  - `current_time`: Current server date and time (RFC3339 format)
+  - `startup_time`: Server startup time, representing when this version was deployed (RFC3339 format)
+  - `uptime_seconds`: Server uptime in seconds
+
+**Example Response:**
+
+```json
+{
+  "current_time": "2024-01-15T10:30:45Z",
+  "startup_time": "2024-01-15T10:00:00Z",
+  "uptime_seconds": 1845
+}
+```
+
+**Usage:**
+
+```bash
+curl http://localhost:8080/healthcheck
+```
+
+This endpoint is useful for monitoring server status and deployment verification.
+
 ## Project Structure
 
 ```
