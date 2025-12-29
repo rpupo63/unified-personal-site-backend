@@ -1,0 +1,464 @@
+basePath: /
+definitions:
+  api.BlogPostCollectionWithTags:
+    properties:
+      blogPosts:
+        items:
+          $ref: '#/definitions/api.BlogPostWithTags'
+        type: array
+      total:
+        type: integer
+    type: object
+  api.BlogPostWithTags:
+    properties:
+      blogPost:
+        $ref: '#/definitions/models.BlogPost'
+      tags:
+        items:
+          $ref: '#/definitions/models.BlogTag'
+        type: array
+    type: object
+  api.ErrorResponse:
+    description: Error response structure
+    properties:
+      cause:
+        example: Underlying error cause
+        type: string
+      details:
+        example: Additional error details
+        type: string
+      error:
+        example: Internal Server Error
+        type: string
+      field:
+        example: title
+        type: string
+      status:
+        example: error
+        type: string
+    type: object
+  api.ProjectCollectionWithTags:
+    properties:
+      projects:
+        items:
+          $ref: '#/definitions/api.ProjectWithTags'
+        type: array
+      total:
+        type: integer
+    type: object
+  api.ProjectWithTags:
+    properties:
+      project:
+        $ref: '#/definitions/models.Project'
+      tags:
+        items:
+          $ref: '#/definitions/models.ProjectTag'
+        type: array
+    type: object
+  models.BlogPost:
+    properties:
+      content:
+        type: string
+      dateAdded:
+        type: string
+      dateEdited:
+        type: string
+      id:
+        type: string
+      length:
+        type: integer
+      summary:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/models.BlogTag'
+        type: array
+      title:
+        type: string
+      url:
+        type: string
+    type: object
+  models.BlogTag:
+    properties:
+      blog_post:
+        $ref: '#/definitions/models.BlogPost'
+      blog_post_id:
+        type: string
+      id:
+        type: string
+      value:
+        type: string
+    type: object
+  models.Project:
+    properties:
+      demo_link:
+        type: string
+      description:
+        type: string
+      gif_link:
+        type: string
+      github_link:
+        type: string
+      id:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/models.ProjectTag'
+        type: array
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  models.ProjectTag:
+    properties:
+      id:
+        type: string
+      project:
+        $ref: '#/definitions/models.Project'
+      project_id:
+        type: string
+      value:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: API for managing personal site projects and blog posts
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Personal Site API
+  version: "1.0"
+paths:
+  /blog-post:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new blog post in the database and posts it to all configured
+        social media platforms
+      parameters:
+      - description: Blog post data
+        in: body
+        name: blogPost
+        required: true
+        schema:
+          $ref: '#/definitions/models.BlogPost'
+      - description: Main image URL for Substack posting
+        in: query
+        name: mainImageURL
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created blog post with tags
+          schema:
+            $ref: '#/definitions/api.BlogPostWithTags'
+        "400":
+          description: Bad Request - Invalid blog post data
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error creating blog post
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Create blog post
+      tags:
+      - Blog Posts
+  /blog-post/{blogPostID}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a blog post from the database by ID
+      parameters:
+      - description: Blog Post ID
+        format: uuid
+        in: path
+        name: blogPostID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success message
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request - Invalid blogPostID
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found - Blog post not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error deleting blog post
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Delete blog post
+      tags:
+      - Blog Posts
+    get:
+      consumes:
+      - application/json
+      description: Retrieves detailed information about a specific blog post by ID
+        with its tags
+      parameters:
+      - description: Blog Post ID
+        format: uuid
+        in: path
+        name: blogPostID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Blog post details with tags
+          schema:
+            $ref: '#/definitions/api.BlogPostWithTags'
+        "400":
+          description: Bad Request - Invalid blogPostID
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found - Blog post not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error fetching blog post
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get blog post
+      tags:
+      - Blog Posts
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing blog post in the database
+      parameters:
+      - description: Blog Post ID
+        format: uuid
+        in: path
+        name: blogPostID
+        required: true
+        type: string
+      - description: Updated blog post data
+        in: body
+        name: blogPost
+        required: true
+        schema:
+          $ref: '#/definitions/models.BlogPost'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated blog post with tags
+          schema:
+            $ref: '#/definitions/api.BlogPostWithTags'
+        "400":
+          description: Bad Request - Invalid blog post data
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found - Blog post not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error updating blog post
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Update blog post
+      tags:
+      - Blog Posts
+  /blog-posts:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all blog posts from the database with their associated
+        tags
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of blog posts with tags
+          schema:
+            $ref: '#/definitions/api.BlogPostCollectionWithTags'
+        "500":
+          description: Internal Server Error - Error fetching blog posts
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get all blog posts
+      tags:
+      - Blog Posts
+  /project:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new project in the database
+      parameters:
+      - description: Project data
+        in: body
+        name: project
+        required: true
+        schema:
+          $ref: '#/definitions/models.Project'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created project with tags
+          schema:
+            $ref: '#/definitions/api.ProjectWithTags'
+        "400":
+          description: Bad Request - Invalid project data
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error creating project
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Create project
+      tags:
+      - Projects
+  /project/{projectID}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a project from the database by ID
+      parameters:
+      - description: Project ID
+        format: uuid
+        in: path
+        name: projectID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success message
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request - Invalid projectID
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found - Project not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error deleting project
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Delete project
+      tags:
+      - Projects
+    get:
+      consumes:
+      - application/json
+      description: Retrieves detailed information about a specific project by ID with
+        its tags
+      parameters:
+      - description: Project ID
+        format: uuid
+        in: path
+        name: projectID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Project details with tags
+          schema:
+            $ref: '#/definitions/api.ProjectWithTags'
+        "400":
+          description: Bad Request - Invalid projectID
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found - Project not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error fetching project
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get project
+      tags:
+      - Projects
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing project in the database
+      parameters:
+      - description: Project ID
+        format: uuid
+        in: path
+        name: projectID
+        required: true
+        type: string
+      - description: Updated project data
+        in: body
+        name: project
+        required: true
+        schema:
+          $ref: '#/definitions/models.Project'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated project with tags
+          schema:
+            $ref: '#/definitions/api.ProjectWithTags'
+        "400":
+          description: Bad Request - Invalid project data
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found - Project not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error - Error updating project
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Update project
+      tags:
+      - Projects
+  /projects:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all projects from the database with their associated
+        tags
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of projects with tags
+          schema:
+            $ref: '#/definitions/api.ProjectCollectionWithTags'
+        "500":
+          description: Internal Server Error - Error fetching projects
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get all projects
+      tags:
+      - Projects
+schemes:
+- http
+- https
+swagger: "2.0"

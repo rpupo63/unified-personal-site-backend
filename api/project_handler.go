@@ -52,7 +52,7 @@ type ProjectCollectionWithTags struct {
 // @Accept json
 // @Produce json
 // @Success 200 {object} ProjectCollectionWithTags "List of projects with tags"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error fetching projects"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error fetching projects"
 // @Router /projects [get]
 func (h projectHandler) getAllProjects() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -90,9 +90,9 @@ func (h projectHandler) getAllProjects() http.HandlerFunc {
 // @Produce json
 // @Param projectID path string true "Project ID" format(uuid)
 // @Success 200 {object} ProjectWithTags "Project details with tags"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid projectID"
-// @Failure 404 {object} errs.ErrorResponse "Not Found - Project not found"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error fetching project"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid projectID"
+// @Failure 404 {object} api.ErrorResponse "Not Found - Project not found"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error fetching project"
 // @Router /project/{projectID} [get]
 func (h projectHandler) getProject() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -138,8 +138,8 @@ func (h projectHandler) getProject() http.HandlerFunc {
 // @Produce json
 // @Param project body models.Project true "Project data"
 // @Success 201 {object} ProjectWithTags "Created project with tags"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid project data"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error creating project"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid project data"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error creating project"
 // @Router /project [post]
 func (h projectHandler) createProject() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -213,9 +213,9 @@ func (h projectHandler) createProject() http.HandlerFunc {
 // @Param projectID path string true "Project ID" format(uuid)
 // @Param project body models.Project true "Updated project data"
 // @Success 200 {object} ProjectWithTags "Updated project with tags"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid project data"
-// @Failure 404 {object} errs.ErrorResponse "Not Found - Project not found"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error updating project"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid project data"
+// @Failure 404 {object} api.ErrorResponse "Not Found - Project not found"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error updating project"
 // @Router /project/{projectID} [put]
 func (h projectHandler) updateProject() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -291,9 +291,9 @@ func (h projectHandler) updateProject() http.HandlerFunc {
 // @Produce json
 // @Param projectID path string true "Project ID" format(uuid)
 // @Success 200 {object} map[string]string "Success message"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid projectID"
-// @Failure 404 {object} errs.ErrorResponse "Not Found - Project not found"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error deleting project"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid projectID"
+// @Failure 404 {object} api.ErrorResponse "Not Found - Project not found"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error deleting project"
 // @Router /project/{projectID} [delete]
 func (h projectHandler) deleteProject() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

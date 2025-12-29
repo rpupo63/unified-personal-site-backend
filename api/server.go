@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"github.com/rpupo63/unified-personal-site-backend/config"
 	"github.com/rpupo63/unified-personal-site-backend/database"
 	"github.com/rs/zerolog/log"
@@ -21,8 +22,12 @@ type Server struct {
 func NewServer(database database.Database) (Server, error) {
 	c := config.New()
 
-	// Hardcoded address
-	address := "0.0.0.0:8080" // Bind to 0.0.0.0 for external access
+	// Get port from environment variable, default to 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	address := "0.0.0.0:" + port // Bind to 0.0.0.0 for external access
 
 	// Capture startup time
 	startupTime := time.Now()
@@ -84,6 +89,17 @@ func newRouter(database database.Database, opts ...func(*router)) *chi.Mux {
 	acceptedOrigins := strings.Split(os.Getenv("ACCEPTED_ORIGINS"), ",")
 	chiRouter.Use(CORSCheckMiddleware(acceptedOrigins))
 	chiRouter.Use(corsMiddleware(acceptedOrigins))
+
+	// Swagger documentation route
+	// Get port from environment variable, default to 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	swaggerURL := "http://localhost:" + port + "/swagger/doc.json"
+	chiRouter.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL(swaggerURL), // The url pointing to API definition
+	))
 
 	// Setup all route types
 	setupFrontendRoutes(chiRouter, handlers, authMiddleware)

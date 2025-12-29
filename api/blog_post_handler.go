@@ -55,7 +55,7 @@ type BlogPostCollectionWithTags struct {
 // @Accept json
 // @Produce json
 // @Success 200 {object} BlogPostCollectionWithTags "List of blog posts with tags"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error fetching blog posts"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error fetching blog posts"
 // @Router /blog-posts [get]
 func (h blogPostHandler) getAllBlogPosts() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -93,9 +93,9 @@ func (h blogPostHandler) getAllBlogPosts() http.HandlerFunc {
 // @Produce json
 // @Param blogPostID path string true "Blog Post ID" format(uuid)
 // @Success 200 {object} BlogPostWithTags "Blog post details with tags"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid blogPostID"
-// @Failure 404 {object} errs.ErrorResponse "Not Found - Blog post not found"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error fetching blog post"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid blogPostID"
+// @Failure 404 {object} api.ErrorResponse "Not Found - Blog post not found"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error fetching blog post"
 // @Router /blog-post/{blogPostID} [get]
 func (h blogPostHandler) getBlogPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -142,8 +142,8 @@ func (h blogPostHandler) getBlogPost() http.HandlerFunc {
 // @Param blogPost body models.BlogPost true "Blog post data"
 // @Param mainImageURL query string false "Main image URL for Substack posting"
 // @Success 201 {object} BlogPostWithTags "Created blog post with tags"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid blog post data"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error creating blog post"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid blog post data"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error creating blog post"
 // @Router /blog-post [post]
 func (h blogPostHandler) createBlogPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -259,9 +259,9 @@ func (h blogPostHandler) createBlogPost() http.HandlerFunc {
 // @Param blogPostID path string true "Blog Post ID" format(uuid)
 // @Param blogPost body models.BlogPost true "Updated blog post data"
 // @Success 200 {object} BlogPostWithTags "Updated blog post with tags"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid blog post data"
-// @Failure 404 {object} errs.ErrorResponse "Not Found - Blog post not found"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error updating blog post"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid blog post data"
+// @Failure 404 {object} api.ErrorResponse "Not Found - Blog post not found"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error updating blog post"
 // @Router /blog-post/{blogPostID} [put]
 func (h blogPostHandler) updateBlogPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -346,9 +346,9 @@ func (h blogPostHandler) updateBlogPost() http.HandlerFunc {
 // @Produce json
 // @Param blogPostID path string true "Blog Post ID" format(uuid)
 // @Success 200 {object} map[string]string "Success message"
-// @Failure 400 {object} errs.ErrorResponse "Bad Request - Invalid blogPostID"
-// @Failure 404 {object} errs.ErrorResponse "Not Found - Blog post not found"
-// @Failure 500 {object} errs.ErrorResponse "Internal Server Error - Error deleting blog post"
+// @Failure 400 {object} api.ErrorResponse "Bad Request - Invalid blogPostID"
+// @Failure 404 {object} api.ErrorResponse "Not Found - Blog post not found"
+// @Failure 500 {object} api.ErrorResponse "Internal Server Error - Error deleting blog post"
 // @Router /blog-post/{blogPostID} [delete]
 func (h blogPostHandler) deleteBlogPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

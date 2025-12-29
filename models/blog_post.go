@@ -16,5 +16,5 @@ type BlogPost struct {
 	DateEdited *time.Time `json:"dateEdited,omitempty" db:"date_edited" gorm:"type:timestamp"`
 	Length     int        `json:"length" db:"length" gorm:"type:integer;not null;default:0"`
 	URL        *string    `json:"url,omitempty" db:"url" gorm:"type:text"`
-	Tags       []BlogTag  `json:"tags,omitempty" gorm:"foreignKey:BlogPostID;references:ID"`
+	Tags       []BlogTag  `json:"tags,omitempty" gorm:"foreignKey:BlogPostID;references:ID;constraint:OnDelete:CASCADE"`
 }

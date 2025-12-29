@@ -11,5 +11,5 @@ type Project struct {
 	DemoLink    string       `json:"demo_link" db:"demo_link" gorm:"type:text;not null"`
 	Type        string       `json:"type" db:"type" gorm:"type:text;not null"`
 	GifLink     *string      `json:"gif_link,omitempty" db:"gif_link" gorm:"type:text"`
-	Tags        []ProjectTag `json:"tags,omitempty" gorm:"foreignKey:ProjectID;references:ID"`
+	Tags        []ProjectTag `json:"tags,omitempty" gorm:"foreignKey:ProjectID;references:ID;constraint:OnDelete:CASCADE"`
 }

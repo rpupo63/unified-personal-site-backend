@@ -21,6 +21,8 @@ func (r *ProjectRepo) GetDB() *gorm.DB {
 
 // FindAll returns all projects from the database
 func (r *ProjectRepo) FindAll() ([]*models.Project, error) {
+	// Use Preload which GORM optimizes to batch load tags in a single query
+	// This is more efficient than N+1 queries and handles the relationship properly
 	var projects []*models.Project
 	err := r.db.Preload("Tags").Find(&projects).Error
 	return projects, err
