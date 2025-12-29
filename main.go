@@ -41,9 +41,13 @@ import (
 func main() {
 	fmt.Println("Initializing app...")
 
-	// Load environment variables from .env file
+	// Load environment variables from .env file (for local development only)
+	// In production (e.g., Coolify), environment variables are provided directly
+	// Environment variables from the system always take precedence over .env file values
 	if err := godotenv.Load(); err != nil {
-		fmt.Printf("Warning: Error loading .env file: %v\n", err)
+		// This is expected in production environments like Coolify where .env files are not used
+		// Environment variables are provided directly by the platform
+		fmt.Printf("Info: No .env file found (using system environment variables): %v\n", err)
 	}
 
 	// -------------------------------------------------------------------------
