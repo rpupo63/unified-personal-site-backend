@@ -59,6 +59,12 @@ func SendEmail(subject, body string, recipients []string) error {
 		return fmt.Errorf("RESEND_FROM_EMAIL environment variable is required")
 	}
 
+	// Log the from email being used for debugging
+	log.Debug().
+		Str("fromEmail", fromEmail).
+		Strs("recipients", recipients).
+		Msg("Preparing to send email via Resend")
+
 	// Create Resend client
 	client := resend.NewClient(apiKey)
 
@@ -73,6 +79,12 @@ func SendEmail(subject, body string, recipients []string) error {
 	// Send email
 	sent, err := client.Emails.Send(params)
 	if err != nil {
+		// Log detailed error information for debugging
+		log.Error().
+			Err(err).
+			Str("fromEmail", fromEmail).
+			Strs("recipients", recipients).
+			Msg("Resend API error details")
 		return fmt.Errorf("failed to send email via Resend: %w", err)
 	}
 

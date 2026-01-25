@@ -3,16 +3,18 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	httpSwagger "github.com/swaggo/http-swagger"
 	"github.com/rpupo63/unified-personal-site-backend/config"
 	"github.com/rpupo63/unified-personal-site-backend/database"
 	"github.com/rs/zerolog/log"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 type Server struct {
@@ -77,6 +79,14 @@ func newRouter(database database.Database, opts ...func(*router)) *chi.Mux {
 	chiRouter := chi.NewRouter()
 	chiRouter.Use(LogInternalServerErrors)
 
+	// Apply CORS middleware (must be before routes)
+	acceptedOrigins := strings.Split(os.Getenv("ACCEPTED_ORIGINS"), ",")
+	chiRouter.Use(CORSCheckMiddleware(acceptedOrigins))
+	chiRouter.Use(corsMiddleware(acceptedOrigins))
+
+	// Root endpoint - Message of the Day
+	chiRouter.Get("/", rootHandler())
+
 	// Healthcheck endpoint - accessible from any origin
 	chiRouter.Get("/healthcheck", healthcheckHandler(router.startupTime))
 
@@ -88,11 +98,6 @@ func newRouter(database database.Database, opts ...func(*router)) *chi.Mux {
 
 	// Initialize auth middleware
 	authMiddleware := newAuthMiddleware()
-
-	// Apply CORS middleware
-	acceptedOrigins := strings.Split(os.Getenv("ACCEPTED_ORIGINS"), ",")
-	chiRouter.Use(CORSCheckMiddleware(acceptedOrigins))
-	chiRouter.Use(corsMiddleware(acceptedOrigins))
 
 	// Swagger documentation route
 	// Get port from environment variable, default to 8080
@@ -129,6 +134,54 @@ func (s Server) ShutdownGracefully(timeout time.Duration) {
 	}
 }
 
+// rootHandler returns a handler function for the root endpoint
+// It displays a "Message of the Day" that adapts based on the client:
+// - Plain text for curl/command-line tools
+// - HTML terminal-style interface for browsers
+func rootHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// 1. A subtle nod in the headers (Visible in DevTools or curl -v)
+		w.Header().Set("X-Powered-By", "Arch Linux (btw)")
+		w.Header().Set("X-Quantum-State", "Superposition")
+
+		// 2. Personal Easter Eggs
+		quotes := []string{
+			"SYSTEM STATUS: ONLINE. \nWARNING: Cat detected in server room.",
+			"EXECUTION STRATEGY: One way out.",
+			"QUANTUM COHERENCE: 99.9%. \nWavefunction has not yet collapsed.",
+			"HYPRLAND CONFIG: Loaded. \nTile Layout: Dwindle.",
+			"TARGET: The Witness. \nPuzzle status: Unsolved.",
+		}
+
+		// Pick a random quote
+		rand.Seed(time.Now().UnixNano())
+		selectedQuote := quotes[rand.Intn(len(quotes))]
+
+		// 3. Check User-Agent. If it's a browser, render a mini terminal.
+		userAgent := r.Header.Get("User-Agent")
+		if !strings.Contains(userAgent, "curl") {
+			w.Header().Set("Content-Type", "text/html")
+			html := fmt.Sprintf(`
+        <html>
+        <body style="background:#1e1e2e; color:#cdd6f4; font-family: monospace; display:flex; align-items:center; justify-content:center; height:100vh;">
+            <div style="border: 1px solid #fab387; padding: 20px; border-radius: 5px;">
+                <p style="color:#fab387;">root@api.pupo.codes:~# ./status</p>
+                <p>%s</p>
+                <span style="animation: blink 1s infinite;">_</span>
+            </div>
+            <style>@keyframes blink{50%%{opacity:0;}}</style>
+        </body>
+        </html>`, selectedQuote)
+			w.Write([]byte(html))
+			return
+		}
+
+		// 4. Default plain text response for curl
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte(selectedQuote + "\n"))
+	}
+}
+
 // healthcheckHandler returns a handler function for the healthcheck endpoint
 // It returns the current date/time and the server startup time (when this version was deployed)
 func healthcheckHandler(startupTime time.Time) http.HandlerFunc {
@@ -147,8 +200,8 @@ func healthcheckHandler(startupTime time.Time) http.HandlerFunc {
 
 		// Create response with current time and startup time
 		response := map[string]interface{}{
-			"current_time":  time.Now().Format(time.RFC3339),
-			"startup_time":  startupTime.Format(time.RFC3339),
+			"current_time":   time.Now().Format(time.RFC3339),
+			"startup_time":   startupTime.Format(time.RFC3339),
 			"uptime_seconds": int(time.Since(startupTime).Seconds()),
 		}
 

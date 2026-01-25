@@ -4,6 +4,7 @@ package api
 type routeHandlers struct {
 	projectHandler  projectHandler
 	blogPostHandler blogPostHandler
+	contactHandler  contactHandler
 }
 
 // ErrorResponse represents an error response from the API

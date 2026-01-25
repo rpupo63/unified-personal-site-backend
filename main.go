@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -41,139 +40,81 @@ import (
 func main() {
 	fmt.Println("Initializing app...")
 
-	// Load environment variables from .env file (for local development only)
-	// In production (e.g., Coolify), environment variables are provided directly
-	// Environment variables from the system always take precedence over .env file values
+	// 1. Load Environment Variables
 	if err := godotenv.Load(); err != nil {
-		// This is expected in production environments like Coolify where .env files are not used
-		// Environment variables are provided directly by the platform
 		fmt.Printf("Info: No .env file found (using system environment variables): %v\n", err)
 	}
 
-	// -------------------------------------------------------------------------
-	// DATABASE CONNECTION LOGIC
-	// -------------------------------------------------------------------------
-	var db *gorm.DB
-	var err error
-	var currentDB database.Database
+	// 2. Get Connection String
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		// Fallback for individual env vars if DATABASE_URL is missing
+		host := os.Getenv("SUPABASE_DB_HOST")
+		user := os.Getenv("SUPABASE_DB_USER")
+		pass := os.Getenv("SUPABASE_DB_PASSWORD")
+		name := os.Getenv("SUPABASE_DB_NAME")
+		port := os.Getenv("SUPABASE_DB_PORT") // Should be 5432
 
-	// Priority 1: Full Connection String (Recommended for Pooler)
-	connStr := getEnv("DATABASE_URL", "")
-	if connStr == "" {
-		connStr = getEnv("SUPABASE_DB_URL", "")
+		if host != "" && user != "" {
+			if port == "" {
+				port = "5432"
+			}
+			dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require", host, user, pass, name, port)
+		} else {
+			log.Fatal("Error: DATABASE_URL not set. Please set it in your .env file.")
+		}
 	}
 
-	// Priority 2: Individual Components
-	if connStr == "" {
-		host := getEnv("SUPABASE_DB_HOST", "")
-		// Note: Supabase Transaction Pooler uses port 6543
-		port := getEnv("SUPABASE_DB_PORT", "6543")
-		user := getEnv("SUPABASE_DB_USER", "")
-		password := getEnv("SUPABASE_DB_PASSWORD", "")
-		dbname := getEnv("SUPABASE_DB_NAME", "postgres")
-
-		if host == "" || user == "" || password == "" {
-			fmt.Printf("Error: Missing required database configuration.\n")
-			fmt.Printf("Set DATABASE_URL or (SUPABASE_DB_HOST, SUPABASE_DB_USER, SUPABASE_DB_PASSWORD)\n")
-			os.Exit(1)
-		}
-
-		connStr = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=require",
-			host, user, password, dbname, port)
-	} else {
-		// Validate provided string
-		normalized, err := normalizeConnectionString(connStr)
-		if err != nil {
-			fmt.Printf("Error: Invalid connection string: %v\n", err)
-			os.Exit(1)
-		}
-		connStr = normalized
-	}
-
-	fmt.Println("Connecting to Supabase (Transaction Pooler)...")
-
+	// 3. Connect to Supabase (Session Mode / Port 5432)
+	// We use the standard logger configuration
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
 			SlowThreshold:             200 * time.Millisecond,
-			LogLevel:                  logger.Warn,
+			LogLevel:                  logger.Info, // Info helps debug connection issues
 			IgnoreRecordNotFoundError: true,
 			Colorful:                  true,
 		},
 	)
 
-	// -------------------------------------------------------------------------
-	// CRITICAL SUPABASE POOLER CONFIGURATION
-	// -------------------------------------------------------------------------
-	db, err = gorm.Open(postgres.New(postgres.Config{
-		DSN: connStr,
-		// PreferSimpleProtocol is CRITICAL for the Transaction Pooler (port 6543).
-		// It disables the extended query protocol which creates prepared statements.
-		PreferSimpleProtocol: true,
-	}), &gorm.Config{
-		// PrepareStmt must be FALSE. The pooler does not support prepared statements
-		// in Transaction mode.
-		PrepareStmt: false,
-		Logger:      newLogger,
+	fmt.Println("Connecting to Supabase (Session Mode)...")
+
+	// Standard GORM connection.
+	// We do NOT disable PrepareStmt because we are using Port 5432 (Session Mode).
+	// This allows Go to cache statements for better performance.
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: newLogger,
 	})
 
 	if err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "network is unreachable") {
-			fmt.Printf("Network Error: Unreachable. (Check IPv6 settings or Host address)\n")
-		} else {
-			fmt.Printf("Error connecting to database: %v\n", err)
-		}
-		os.Exit(1)
+		log.Fatalf("Error connecting to database: %v", err)
 	}
 
-	// Enable required PostgreSQL extensions
-	// Note: 'vector' extension is required for Embeddings/AI features
-	// Use a separate session with a higher slow threshold for extension creation
-	// to avoid warnings during startup (extension creation can be slow on first run)
-	extensionLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
-		logger.Config{
-			SlowThreshold:             1 * time.Second, // Higher threshold for extension creation
-			LogLevel:                  logger.Warn,
-			IgnoreRecordNotFoundError: true,
-			Colorful:                  true,
-		},
-	)
-	extensionDB := db.Session(&gorm.Session{
-		Logger: extensionLogger,
-	})
+	// 4. Enable Required Extensions
+	// We use a separate session context for this to prevent timeouts
+	setupExtensions(db)
 
-	if err := extensionDB.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"").Error; err != nil {
-		fmt.Printf("Error enabling uuid-ossp extension: %v\n", err)
-		os.Exit(1)
-	}
-	if err := extensionDB.Exec("CREATE EXTENSION IF NOT EXISTS \"vector\"").Error; err != nil {
-		fmt.Printf("Error enabling vector extension: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Test connection
+	// 5. Configure Connection Pool
+	// This optimization is important for long-running Go services
 	sqlDB, err := db.DB()
 	if err != nil {
-		fmt.Printf("Error getting generic database object: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Error getting generic database object: %v", err)
 	}
 
-	// Set connection pool settings to prevent opening too many connections
-	// in the container, though the Supabase Pooler handles the hard limit.
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
+	// Ping to verify
 	if err := sqlDB.Ping(); err != nil {
-		fmt.Printf("Error pinging database: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Error pinging database: %v", err)
 	}
+	fmt.Println("🚀 Connected to Supabase successfully")
 
-	currentDB = database.New(db)
+	// 6. Wrap for Application
+	currentDB := database.New(db)
 
-	// Handle Generation flags
+	// 7. Handle CLI Flags
 	if strings.ToLower(os.Getenv("GENERATE_MODELS")) == "true" {
 		fmt.Println("Generating models...")
 		models.GenerateModels(db)
@@ -186,14 +127,31 @@ func main() {
 		return
 	}
 
-	// Initialize Server
+	// 8. Start Server
+	startServer(currentDB)
+}
+
+func setupExtensions(db *gorm.DB) {
+	// Use a higher timeout for extension creation
+	ctx := db.Session(&gorm.Session{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
+
+	if err := ctx.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"").Error; err != nil {
+		log.Fatalf("Error enabling uuid-ossp extension: %v", err)
+	}
+	if err := ctx.Exec("CREATE EXTENSION IF NOT EXISTS \"vector\"").Error; err != nil {
+		log.Fatalf("Error enabling vector extension: %v", err)
+	}
+}
+
+func startServer(db database.Database) {
 	errChannel := make(chan error)
 	defer close(errChannel)
 
-	server, err := api.NewServer(currentDB)
+	server, err := api.NewServer(db)
 	if err != nil {
-		fmt.Printf("Error initializing server: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Error initializing server: %v", err)
 	}
 
 	go server.Start(errChannel)
@@ -205,89 +163,8 @@ func main() {
 	server.ShutdownGracefully(30 * time.Second)
 }
 
-// listenToInterrupt waits for SIGINT or SIGTERM
 func listenToInterrupt(errChannel chan<- error) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	errChannel <- fmt.Errorf("%s", <-c)
-}
-
-// getEnv returns the value or fallback
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return fallback
-}
-
-// normalizeConnectionString validates and standardizes the connection string
-func normalizeConnectionString(connStr string) (string, error) {
-	connStr = strings.TrimSpace(connStr)
-	if connStr == "" {
-		return "", fmt.Errorf("connection string is empty")
-	}
-
-	if strings.HasPrefix(connStr, "postgres://") || strings.HasPrefix(connStr, "postgresql://") {
-		return normalizeURLConnectionString(connStr)
-	}
-	return normalizeKeyValueConnectionString(connStr)
-}
-
-func normalizeURLConnectionString(urlStr string) (string, error) {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse URL: %w", err)
-	}
-
-	host := parsedURL.Hostname()
-	if host == "" {
-		return "", fmt.Errorf("missing host")
-	}
-
-	port := parsedURL.Port()
-	if port == "" {
-		port = "5432"
-	} // Default fallback, though Pooler is 6543
-
-	user := parsedURL.User.Username()
-	if user == "" {
-		return "", fmt.Errorf("missing user")
-	}
-
-	password, hasPassword := parsedURL.User.Password()
-	if !hasPassword {
-		return "", fmt.Errorf("missing password")
-	}
-
-	dbname := strings.TrimPrefix(parsedURL.Path, "/")
-	if dbname == "" {
-		return "", fmt.Errorf("missing dbname")
-	}
-
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
-		host, port, user, password, dbname)
-
-	sslmode := parsedURL.Query().Get("sslmode")
-	if sslmode == "" {
-		sslmode = "require"
-	}
-	connStr += fmt.Sprintf(" sslmode=%s", sslmode)
-
-	return connStr, nil
-}
-
-func normalizeKeyValueConnectionString(connStr string) (string, error) {
-	if !strings.Contains(connStr, "host=") {
-		return "", fmt.Errorf("missing 'host='")
-	}
-	if !strings.Contains(connStr, "user=") {
-		return "", fmt.Errorf("missing 'user='")
-	}
-	if !strings.Contains(connStr, "dbname=") && !strings.Contains(connStr, "database=") {
-		return "", fmt.Errorf("missing 'dbname='")
-	}
-	if !strings.Contains(connStr, "sslmode=") {
-		connStr += " sslmode=require"
-	}
-	return connStr, nil
 }

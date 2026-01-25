@@ -1,0 +1,39 @@
+#!/bin/bash
+set -e
+
+HEALTH_URL="http://localhost:8080/healthcheck"
+MAX_RETRIES=10
+RETRY_DELAY=2
+
+echo "Building production binary..."
+go build -ldflags="-s -w" -o server .
+
+echo "Uploading to racknerd-backend..."
+scp server racknerd-backend:~
+
+echo "Installing binary and restarting service..."
+ssh racknerd-backend '
+    sudo systemctl stop backend-api
+    sudo mv ~/server /opt/backend-api/server
+    sudo chown api-service:api-service /opt/backend-api/server
+    sudo chmod +x /opt/backend-api/server
+    sudo systemctl daemon-reload
+    sudo systemctl restart backend-api
+'
+
+echo "Checking deployment health..."
+for i in $(seq 1 $MAX_RETRIES); do
+    if ssh racknerd-backend "curl -sf $HEALTH_URL" > /dev/null 2>&1; then
+        echo "Health check passed!"
+        ssh racknerd-backend "curl -s $HEALTH_URL" | jq .
+        echo "Deploy complete!"
+        exit 0
+    fi
+    echo "Attempt $i/$MAX_RETRIES - waiting ${RETRY_DELAY}s..."
+    sleep $RETRY_DELAY
+done
+
+echo "Health check failed after $MAX_RETRIES attempts!"
+echo "Checking service status..."
+ssh racknerd-backend 'sudo systemctl status backend-api'
+exit 1

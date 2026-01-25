@@ -154,7 +154,10 @@ Set these in Coolify's environment variables section:
 - `PORT` (optional, defaults to 8080)
 - `ACCEPTED_ORIGINS` (comma-separated list of allowed CORS origins)
 - `BACKEND_PASSWORD` (for API authentication)
-- Any service-specific variables (e.g., `RESEND_API_KEY`, `MEDIUM_INTEGRATION_TOKEN`, etc.)
+- `CONTACT_RECIPIENT_EMAIL` (for contact form and newsletter endpoints)
+- `RESEND_API_KEY` (for email sending via Resend API)
+- `RESEND_FROM_EMAIL` (for email sending via Resend API)
+- Any other service-specific variables (e.g., `MEDIUM_INTEGRATION_TOKEN`, etc.)
 
 **Additional Environment Variables:**
 
@@ -205,6 +208,40 @@ API documentation is available via Swagger at:
 - Swagger UI: `http://localhost:8080/swagger/index.html`
 - Swagger JSON: `http://localhost:8080/swagger/doc.json`
 
+## Root Endpoint (Message of the Day)
+
+The backend provides a root endpoint (`/`) that displays a "Message of the Day" with a fun, personalized touch. The response adapts based on the client:
+
+- **Endpoint:** `GET /`
+- **CORS:** Accessible from any origin (no authentication required)
+- **Response Format:** 
+  - **curl/command-line tools:** Plain text with a random status message
+  - **Browsers:** HTML terminal-style interface with dark mode styling (Catppuccin colors)
+
+**Custom Headers:**
+- `X-Powered-By`: "Arch Linux (btw)"
+- `X-Quantum-State`: "Superposition"
+
+**Example Usage:**
+
+```bash
+# Plain text response for curl
+curl http://localhost:8080/
+
+# Example output:
+# SYSTEM STATUS: ONLINE.
+# WARNING: Cat detected in server room.
+```
+
+When accessed from a browser, the endpoint displays a styled terminal window with the status message and a blinking cursor.
+
+**Available Messages:**
+The endpoint cycles through various personalized messages including:
+- System status updates
+- Quantum physics references
+- Arch Linux/Hyprland configuration notes
+- Puzzle game references
+
 ## Healthcheck Endpoint
 
 The backend provides a healthcheck endpoint that can be accessed from any origin:
@@ -233,6 +270,95 @@ curl http://localhost:8080/healthcheck
 ```
 
 This endpoint is useful for monitoring server status and deployment verification.
+
+## Contact Endpoints
+
+The backend provides public endpoints for contact form submissions and newsletter subscriptions. These endpoints do not require authentication and are accessible from any origin (subject to CORS configuration).
+
+### Submit Contact Form
+
+- **Endpoint:** `POST /api/contact`
+- **CORS:** Accessible from any origin (no authentication required)
+- **Request Body:**
+  ```json
+  {
+    "name": "John Doe",
+    "email": "[email protected]",
+    "subject": "Optional subject line",
+    "message": "Your message here (minimum 10 characters)"
+  }
+  ```
+- **Response:** JSON object containing:
+  ```json
+  {
+    "success": true,
+    "message": "Thank you for your message! I'll get back to you soon."
+  }
+  ```
+- **Validation:**
+  - `name`: Required, must not be empty
+  - `email`: Required, must be a valid email address (contains "@")
+  - `subject`: Optional
+  - `message`: Required, must be at least 10 characters
+
+**Example Usage:**
+```bash
+curl -X POST http://localhost:8080/api/contact \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "email": "[email protected]",
+    "subject": "Hello",
+    "message": "This is a test message from the contact form."
+  }'
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid or missing required fields
+- `500 Internal Server Error`: Email service configuration error or email sending failure
+
+### Subscribe to Newsletter
+
+- **Endpoint:** `POST /api/newsletter/subscribe`
+- **CORS:** Accessible from any origin (no authentication required)
+- **Request Body:**
+  ```json
+  {
+    "email": "[email protected]"
+  }
+  ```
+- **Response:** JSON object containing:
+  ```json
+  {
+    "success": true,
+    "message": "Thank you for subscribing to the newsletter!"
+  }
+  ```
+- **Validation:**
+  - `email`: Required, must be a valid email address (contains "@")
+
+**Example Usage:**
+```bash
+curl -X POST http://localhost:8080/api/newsletter/subscribe \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "[email protected]"
+  }'
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid or missing email address
+- `500 Internal Server Error`: Email service configuration error or email sending failure
+
+### Contact Endpoint Configuration
+
+The contact endpoints require the following environment variables:
+
+- **`CONTACT_RECIPIENT_EMAIL`** (required): The email address where contact form submissions and newsletter subscriptions will be sent. This should be set to the site owner's email address.
+- **`RESEND_API_KEY`** (required): Your Resend API key for sending emails. See the [Resend documentation](https://resend.com/docs) for more information.
+- **`RESEND_FROM_EMAIL`** (required): The sender email address in the format "Your Name <[email protected]>". This is used as a fallback for `CONTACT_RECIPIENT_EMAIL` if not set (for development purposes).
+
+**Note:** If `CONTACT_RECIPIENT_EMAIL` is not set, the endpoints will return a 500 error. The email service uses the Resend API to send formatted HTML emails with the contact form details or newsletter subscription information.
 
 ## Project Structure
 

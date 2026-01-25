@@ -6,6 +6,15 @@ import (
 
 // setupFrontendRoutes sets up all routes with authentication
 func setupFrontendRoutes(r chi.Router, handlers *routeHandlers, authMiddleware authMiddleware) {
+	// Public routes (no authentication required)
+	r.Group(func(r chi.Router) {
+		r.Use(ColoredHTTPLoggingMiddleware)
+
+		// Contact Handler endpoints (public)
+		r.Post("/api/contact", handlers.contactHandler.submitContactForm())
+		r.Post("/api/newsletter/subscribe", handlers.contactHandler.subscribeNewsletter())
+	})
+
 	// Authenticated routes
 	r.Group(func(r chi.Router) {
 		//r.Use(authMiddleware.authenticate)

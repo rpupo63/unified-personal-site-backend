@@ -9,5 +9,6 @@ func initializeHandlers(database database.Database, backendPassword string) *rou
 	return &routeHandlers{
 		projectHandler:  newProjectHandler(database.ProjectRepo(), database.ProjectTagRepo()),
 		blogPostHandler: newBlogPostHandler(database.BlogPostRepo(), database.BlogTagRepo()),
+		contactHandler:  newContactHandler(),
 	}
 }
