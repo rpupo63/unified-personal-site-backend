@@ -1,0 +1,11 @@
+---
+description: personal-site Go backend conventions (chi, Supabase)
+globs: ["**/*.go"]
+alwaysApply: false
+---
+
+# Backend (personal-site)
+
+- Keep api / database / models / services layout.
+- Deploy via `./deploy-backend` and DEPLOYMENT_SOP — do not invent a new deploy path.
+- Secrets stay in `.env` (never commit).
